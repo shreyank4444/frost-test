@@ -105,6 +105,17 @@ def verify_schnorr_signature(public_key: Point, message: bytes, signature_hex: s
         print(traceback.format_exc())
         return False
 
+def decode_hex_message(message: str) -> bytes:
+    """Decode a hex message, with or without 0x prefix"""
+    # Remove 0x prefix if present
+    if message.startswith("0x"):
+        message = message[2:]
+    try:
+        return bytes.fromhex(message)
+    except ValueError:
+        # If not valid hex, treat as UTF-8
+        return message.encode()
+
 @app.post("/setup")
 async def setup_participants(setup: ParticipantSetup):
     """Initialize a new set of participants"""
@@ -161,13 +172,13 @@ async def sign_message(request: SignRequest):
             raise HTTPException(status_code=400, detail="Participants not initialized")
         
         print("\n=== SIGNATURE GENERATION DEBUG ===")
-        print(f"Message: {request.message}")
-        print(f"Message bytes: {request.message.encode().hex()}")
+        print(f"Raw message: {request.message}")
+        
+        # Convert message to bytes - handle both hex and UTF-8
+        message = decode_hex_message(request.message)
+        print(f"Message bytes: {message.hex()}")
         print(f"Public key: {group_keys['public_key'].xonly_serialize().hex()}")
         print(f"Participant indexes: {request.participant_indexes}")
-        
-        # Convert message to bytes
-        message = request.message.encode()
         
         # Generate nonces for signing participants
         signing_participants = [participants[i] for i in request.participant_indexes]
