@@ -2,8 +2,8 @@ import secrets
 from src.frost import Participant, Aggregator, G, Q, Point
 
 # --- FROST Network Setup ---
-N = 3  # Number of participants
-T = 2  # Threshold
+N = 5  # Number of participants
+T = 3  # Threshold
 
 # 1. Create participants
 participants = [Participant(index=i+1, threshold=T, participants=N) for i in range(N)]

@@ -190,13 +190,25 @@ async def sign_message(request: SignRequest):
             print(f"First commitment: ({p.nonce_commitment_pair[0].x}, {p.nonce_commitment_pair[0].y})")
             print(f"Second commitment: ({p.nonce_commitment_pair[1].x}, {p.nonce_commitment_pair[1].y})")
         
-        # Create aggregator
-        nonce_pairs = tuple(p.nonce_commitment_pair for p in signing_participants)
+        # Create aggregator - order nonce pairs by participant index
+        # Create mapping from participant index to participant object
+        participant_map = {p.index: p for p in signing_participants}
+        
+        # Order nonce pairs to match participant_indexes order
+        nonce_pairs = []
+        for idx in sorted(request.participant_indexes):
+            if idx not in participant_map:
+                raise HTTPException(
+                    status_code=400, 
+                    detail=f"Participant {idx} not found in signing participants"
+                )
+            nonce_pairs.append(participant_map[idx].nonce_commitment_pair)
+        
         aggregator = Aggregator(
             group_keys['public_key'],
             message,
-            nonce_pairs,
-            tuple(request.participant_indexes)
+            tuple(nonce_pairs),
+            tuple(sorted(request.participant_indexes))
         )
         
         # Get signing inputs
@@ -204,8 +216,9 @@ async def sign_message(request: SignRequest):
         
         # Generate partial signatures
         signature_shares = []
-        for p in signing_participants:
-            share = p.sign(message, nonce_commitment_pairs, tuple(request.participant_indexes))
+        for idx in sorted(request.participant_indexes):
+            p = participant_map[idx]
+            share = p.sign(message, nonce_commitment_pairs, tuple(sorted(request.participant_indexes)))
             print(f"\nParticipant {p.index} signature share: {share}")
             signature_shares.append(share)
         
@@ -281,6 +294,12 @@ def taproot_address(xonly_bytes, testnet=True):
     hrp = 'tb' if testnet else 'bc'
     data = [1] + convertbits(list(xonly_bytes), 8, 5)
     return bech32_encode(hrp, data)
+
+@app.get("/setup/default")
+async def setup_default():
+    """Initialize default 5 participants with 3-of-5 threshold"""
+    setup = ParticipantSetup(threshold=3, total_participants=5)
+    return await setup_participants(setup)
 
 if __name__ == "__main__":
     uvicorn.run("server:app", host="0.0.0.0", port=8000, reload=True)

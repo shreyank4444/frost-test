@@ -105,15 +105,13 @@ class Aggregator:
         # R
         group_commitment = Point()  # Point at infinity
         for index in participant_indexes:
-            if index < 1 or index > len(nonce_commitment_pairs):
-                raise ValueError(f"Participant index {index} is out of range.")
-
             # p_l = H_1(l, m, B), l ∈ S
             binding_value = cls.binding_value(
                 index, message, nonce_commitment_pairs, participant_indexes
             )
-            # D_l, E_l
-            first_commitment, second_commitment = nonce_commitment_pairs[index - 1]
+            # D_l, E_l - find commitment by matching index position
+            commitment_index = participant_indexes.index(index)
+            first_commitment, second_commitment = nonce_commitment_pairs[commitment_index]
 
             # R = ∏ D_l * (E_l)^p_l, l ∈ S
             group_commitment += first_commitment + (binding_value * second_commitment)
@@ -154,9 +152,12 @@ class Aggregator:
         # B
         nonce_commitment_pairs_bytes = []
         for idx in participant_indexes:
-            if idx < 1 or idx > len(nonce_commitment_pairs):
+            # Find commitment by matching index position
+            try:
+                commitment_index = participant_indexes.index(idx)
+                participant_pair = nonce_commitment_pairs[commitment_index]
+            except (ValueError, IndexError):
                 raise ValueError(f"Index {idx} is out of range for nonce commitments.")
-            participant_pair = nonce_commitment_pairs[idx - 1]
             participant_pair_bytes = b"".join(
                 [commitment.sec_serialize() for commitment in participant_pair]
             )
